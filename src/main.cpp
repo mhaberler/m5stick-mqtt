@@ -3,13 +3,35 @@
 #include <PicoMQTT.h>
 #include <ESPmDNS.h>
 #include <ArduinoJson.h>
+#include <WebServer.h>
 
 
-const char* hostname = "m5stick";
+const char* hostname = "picomqtt";
 
 PicoMQTT::Server mqtt;
 wl_status_t wifi_status = WL_STOPPED;
 const int RED_LED_PIN = 10;  // Red LED on M5Stick-CPlus
+
+WebServer server(80);
+
+void handleRoot() {
+    server.send(200, "text/plain", "hello from esp32!");
+}
+
+void handleNotFound() {
+    String message = "File Not Found\n\n";
+    message += "URI: ";
+    message += server.uri();
+    message += "\nMethod: ";
+    message += (server.method() == HTTP_GET) ? "GET" : "POST";
+    message += "\nArguments: ";
+    message += server.args();
+    message += "\n";
+    for (uint8_t i = 0; i < server.args(); i++) {
+        message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+    }
+    server.send(404, "text/plain", message);
+}
 
 void setup() {
     auto cfg = M5.config();
@@ -37,6 +59,13 @@ void setup() {
         MDNS.addService("mqtt", "tcp", 1883);
     }
     mqtt.begin();
+
+    server.on("/", handleRoot);
+    server.on("/inline", []() {
+        server.send(200, "text/plain", "this works as well");
+    });
+    server.onNotFound(handleNotFound);
+
 }
 
 void loop() {
@@ -53,6 +82,8 @@ void loop() {
                 M5.Display.println("WiFi: Connected");
                 M5.Display.print("IP: ");
                 M5.Display.println(WiFi.localIP());
+
+                server.begin();
                 break;
             case WL_NO_SSID_AVAIL:
                 M5.Display.printf("WiFi: SSID\n%s\nnot found\n", WIFI_SSID);
@@ -105,9 +136,29 @@ void loop() {
             // Turn LED off
             digitalWrite(RED_LED_PIN, HIGH);
         }
+        // Button state check
+        static bool lastButtonState = false;
+        bool currentButtonState = M5.BtnA.isPressed();
+        if (currentButtonState != lastButtonState) {
+            if (wifi_status == WL_CONNECTED) {
+                // Blink LED - turn on (LOW because LED is active-low)
+                digitalWrite(RED_LED_PIN, LOW);
+
+                JsonDocument doc;
+                doc["button"] = currentButtonState;
+                log_i("button: %u", currentButtonState);
+                String jsonString;
+                serializeJson(doc, jsonString);
+                mqtt.publish("button/state", jsonString);
+                // Turn LED off
+                digitalWrite(RED_LED_PIN, HIGH);
+            }
+            lastButtonState = currentButtonState;
+        }
         // Handle MQTT
         mqtt.loop();
     }
+    server.handleClient();
 
     yield();
 }
