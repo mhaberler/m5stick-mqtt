@@ -1,18 +1,23 @@
 #include <M5Unified.h>
 #include <WiFi.h>
 #include <PicoMQTT.h>
+#include <PicoWebsocket.h>
 #include <ESPmDNS.h>
 #include <ArduinoJson.h>
 #include <WebServer.h>
 
 
-const char* hostname = "picomqtt";
+WiFiServer tcp_server(1883);
+WiFiServer websocket_underlying_server(81);
+PicoWebsocket::Server<::WiFiServer> websocket_server(websocket_underlying_server);
+PicoMQTT::Server mqtt(tcp_server, websocket_server);
 
-PicoMQTT::Server mqtt;
+WebServer server(80);
+
 wl_status_t wifi_status = WL_STOPPED;
 const int RED_LED_PIN = 10;  // Red LED on M5Stick-CPlus
 
-WebServer server(80);
+const char* hostname = "picomqtt";
 
 void handleRoot() {
     server.send(200, "text/plain", "hello from esp32!");
