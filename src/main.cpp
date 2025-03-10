@@ -139,8 +139,13 @@ void loop() {
             // Turn LED off
             digitalWrite(RED_LED_PIN, HIGH);
         }
+    
+        if (M5.BtnB.isPressed()) {
+            ESP.restart();
+        }
         // Button state check
         static bool lastButtonState = false;
+
         bool currentButtonState = M5.BtnA.isPressed();
         if (currentButtonState != lastButtonState) {
             if (wifi_status == WL_CONNECTED) {
