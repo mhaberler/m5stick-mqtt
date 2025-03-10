@@ -19,9 +19,7 @@ const int RED_LED_PIN = 10;  // Red LED on M5Stick-CPlus
 
 const char* hostname = "picomqtt";
 
-void handleRoot() {
-    server.send(200, "text/plain", "hello from esp32!");
-}
+
 
 void handleNotFound() {
     String message = "File Not Found\n\n";
@@ -36,6 +34,7 @@ void handleNotFound() {
         message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
     }
     server.send(404, "text/plain", message);
+    log_i("reply: %s", message.c_str());
 }
 
 void setup() {
@@ -65,9 +64,8 @@ void setup() {
     }
     mqtt.begin();
 
-    server.on("/", handleRoot);
-    server.on("/inline", []() {
-        server.send(200, "text/plain", "this works as well");
+    server.on("/", []() {
+        server.send(200, "text/plain", "hello from esp32!");
     });
     server.onNotFound(handleNotFound);
 
