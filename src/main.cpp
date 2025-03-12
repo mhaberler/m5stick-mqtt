@@ -63,6 +63,12 @@ void setup() {
         MDNS.addService("mqtt", "tcp", 1883);
     }
     mqtt.begin();
+    mqtt.subscribe("expo/message", [](const char * payload) {
+        if (payload && strlen(payload)) {
+            M5.Display.println(payload);
+            Serial.printf("Received message in topic 'expo/message': %s\n", payload);
+        }
+    });
 
     server.on("/", []() {
         server.send(200, "text/plain", "hello from esp32!");
