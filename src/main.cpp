@@ -49,10 +49,11 @@ void setup() {
     // Initialize IMU
     M5.Imu.init();
 
+#ifdef ARDUINO_M5Stick_C
     // Initialize LED pin
     pinMode(RED_LED_PIN, OUTPUT);
     digitalWrite(RED_LED_PIN, HIGH);  // HIGH is off for this LED
-
+#endif
 
     // Start WiFi in background
     WiFi.setHostname(hostname);
@@ -112,8 +113,11 @@ void loop() {
         static unsigned long lastPublish = 0;
         if (millis() - lastPublish >= 1000) {
 
+#ifdef ARDUINO_M5Stick_C
             // Blink LED - turn on (LOW because LED is active-low)
             digitalWrite(RED_LED_PIN, LOW);
+#endif
+
             JsonDocument doc;
 
             // Get battery info
@@ -142,10 +146,13 @@ void loop() {
 
             // Brief delay for visible blink (100ms)
             delay(100);
+#ifdef ARDUINO_M5Stick_C
+
             // Turn LED off
             digitalWrite(RED_LED_PIN, HIGH);
+#endif
         }
-    
+
         if (M5.BtnB.isPressed()) {
             ESP.restart();
         }
@@ -155,17 +162,20 @@ void loop() {
         bool currentButtonState = M5.BtnA.isPressed();
         if (currentButtonState != lastButtonState) {
             if (wifi_status == WL_CONNECTED) {
+#ifdef ARDUINO_M5Stick_C
                 // Blink LED - turn on (LOW because LED is active-low)
                 digitalWrite(RED_LED_PIN, LOW);
-
+#endif
                 JsonDocument doc;
                 doc["button"] = currentButtonState;
                 log_i("button: %u", currentButtonState);
                 String jsonString;
                 serializeJson(doc, jsonString);
                 mqtt.publish("button/state", jsonString);
+#ifdef ARDUINO_M5Stick_C
                 // Turn LED off
                 digitalWrite(RED_LED_PIN, HIGH);
+#endif
             }
             lastButtonState = currentButtonState;
         }
