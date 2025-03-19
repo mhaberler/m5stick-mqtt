@@ -62,6 +62,7 @@ void setup() {
     // Start mDNS
     if (MDNS.begin(hostname)) {
         MDNS.addService("mqtt", "tcp", 1883);
+        MDNS.addService("mqtt-ws", "tcp", 81);
     }
     mqtt.begin();
     mqtt.subscribe("expo/message", [](const char * payload) {
