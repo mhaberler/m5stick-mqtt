@@ -6,20 +6,28 @@
 #include <ArduinoJson.h>
 #include <WebServer.h>
 
+#include "slconfig.hpp"
+#include <qrcode.h>
 
-WiFiServer tcp_server(1883);
-WiFiServer websocket_underlying_server(81);
+#define MQTT_PORT 1883
+#define HTTP_PORT 80
+#define MQTTWS_PORT 81
+
+
+WiFiServer tcp_server(MQTT_PORT);
+WiFiServer websocket_underlying_server(MQTTWS_PORT);
 PicoWebsocket::Server<::WiFiServer> websocket_server(websocket_underlying_server);
 PicoMQTT::Server mqtt(tcp_server, websocket_server);
 
-WebServer server(80);
+WebServer server(HTTP_PORT);
 
 wl_status_t wifi_status = WL_STOPPED;
 const int RED_LED_PIN = 10;  // Red LED on M5Stick-CPlus
 
 const char* hostname = "picomqtt";
 
-
+void test_zstd(void);
+char *cfg = "{\"sensorState\": {\"Orientation\": {\"enabled\": false, \"speed\": 50}, \"Magnetometer\": {\"enabled\": false, \"speed\": 50}, \"Compass\": {\"enabled\": false}, \"Barometer\": {\"enabled\": false, \"speed\": 1000}, \"Location\": {\"enabled\": false, \"speed\": 1000}, \"Accelerometer\": {\"enabled\": false, \"speed\": 50}, \"Gravity\": {\"speed\": 50}, \"Gyroscope\": {\"speed\": 50}, \"Microphone\": {\"enabled\": false}, \"Bluetooth\": {\"enabled\": false}}, \"http\": {\"enabled\": false, \"url\": \"http://picomqtt.local/foobar\", \"batchPeriod\": 1000, \"skip\": false}, \"mqtt\": {\"enabled\": false, \"url\": \"172.20.10.2\", \"port\": \"1883\", \"tls\": false, \"topic\": \"sensor-logger\", \"batchPeriod\": 5000, \"connectionType\": \"TCP\", \"subscribeTopic\": \"#\", \"skip\": false, \"subscribeEnabled\": true}, \"imageQuality\": \"High\", \"uncalibrated\": false, \"fileFormat\": \".json\", \"fileName\": \"RECORDING_NAME-DATETIME_UTC_FORMATTED\"}";
 
 void handleNotFound() {
     String message = "File Not Found\n\n";
@@ -80,7 +88,6 @@ void setup() {
         server.send(200, "text/plain", "hello from esp32!");
     });
     server.onNotFound(handleNotFound);
-
 }
 
 void loop() {
@@ -99,6 +106,34 @@ void loop() {
                 M5.Display.println(WiFi.localIP());
 
                 server.begin();
+                delay(3000);
+
+                {
+                    String qrcode;
+
+                    M5.Display.clear();
+
+                    JsonDocument doc;
+                    genDefaultCfg(doc);
+
+                    // patch up the default config as needed
+                    doc["http"]["enabled"] = false;
+                    doc["http"]["url"] = "http://" + WiFi.localIP().toString() + ":80/data";
+
+                    doc["mqtt"]["enabled"] =  false;
+                    doc["mqtt"]["url"] = WiFi.localIP().toString() ;
+                    doc["mqtt"]["port"] = "1883";
+                    doc["mqtt"]["tls"] =  false;
+                    doc["mqtt"]["connectionType"] = "TCP";
+                    doc["mqtt"]["subscribeTopic"] = "#";
+
+                    serializeJsonPretty(doc, Serial);
+
+                    sensorloggerCfg(doc, qrcode);
+                    log_i("qrcode: %s", qrcode.c_str());
+
+                    M5.Display.qrcode(qrcode.c_str());
+                }
                 break;
             case WL_NO_SSID_AVAIL:
                 M5.Display.printf("WiFi: SSID\n%s\nnot found\n", WIFI_SSID);
@@ -152,7 +187,6 @@ void loop() {
             // Brief delay for visible blink (100ms)
             delay(100);
 #ifdef ARDUINO_M5Stick_C
-
             // Turn LED off
             digitalWrite(RED_LED_PIN, HIGH);
 #endif
