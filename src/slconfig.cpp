@@ -38,37 +38,6 @@ bool sensorloggerCfg(const JsonDocument &doc, String &output) {
     return sensorloggerCfg(jsonString, output);
 }
 
-bool genLoggingCfg(const String &ip,
-                   uint16_t mqtt_port,
-                   const String &http_uri,
-                   const String &subscribe_topic,
-                   String &result
-                  ) {
-    JsonDocument doc;
-    if (http_uri.length()) {
-        JsonObject http = doc["http"].to<JsonObject>();
-        http["enabled"] = false;
-        http["url"] = http_uri;
-        http["batchPeriod"] = 1000;
-        http["skip"] = false;
-    }
-    if (mqtt_port) {
-        JsonObject mqtt = doc["mqtt"].to<JsonObject>();
-        mqtt["enabled"] = false;
-        mqtt["url"] = ip;
-        mqtt["port"] = mqtt_port;
-        mqtt["tls"] = false;
-        mqtt["topic"] = "sensor-logger";
-        mqtt["batchPeriod"] = 5000;
-        mqtt["connectionType"] = "TCP";
-        mqtt["subscribeTopic"] = subscribe_topic;
-        mqtt["skip"] = false;
-        mqtt["subscribeEnabled"] = true;
-    }
-    return sensorloggerCfg(doc, result);
-}
-
-
 // recreated from sensorlogger "reset to defaults" and exported
 void genDefaultCfg(JsonDocument &doc) {
 
