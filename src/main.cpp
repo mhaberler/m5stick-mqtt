@@ -117,6 +117,17 @@ void loop() {
                     genDefaultCfg(doc);
 
                     // patch up the default config as needed
+                    JsonObject sensorState = doc["sensorState"].to<JsonObject>();
+
+                    sensorState["Barometer"]["enabled"] = true;
+                    sensorState["Barometer"]["speed"] = 1000;
+
+                    sensorState["Location"]["enabled"] = true;
+                    sensorState["Location"]["speed"] = 1000;
+
+                    sensorState["Microphone"]["enabled"] = true;
+                    sensorState["Microphone"]["speed"] = "lossless";
+
                     doc["http"]["enabled"] = false;
                     doc["http"]["url"] = "http://" + WiFi.localIP().toString() + ":80/data";
 
@@ -126,6 +137,8 @@ void loop() {
                     doc["mqtt"]["tls"] =  false;
                     doc["mqtt"]["connectionType"] = "TCP";
                     doc["mqtt"]["subscribeTopic"] = "#";
+                    doc["mqtt"]["subscribeEnabled"] = true;
+                    doc["mqtt"]["skip"] =  false;
 
                     serializeJsonPretty(doc, Serial);
 

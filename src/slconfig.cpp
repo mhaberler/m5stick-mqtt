@@ -75,7 +75,6 @@ void genDefaultCfg(JsonDocument &doc) {
     // Create sensorState object
     JsonObject sensorState = doc["sensorState"].to<JsonObject>();
 
-#ifdef FULL_CONFIG
     // Add sensor objects with their properties
     sensorState["Orientation"]["enabled"] = false;
     sensorState["Magnetometer"]["enabled"] = false;
@@ -84,13 +83,13 @@ void genDefaultCfg(JsonDocument &doc) {
     sensorState["Location"]["enabled"] = false;
     sensorState["Accelerometer"]["enabled"] = false;
 
-    // These objects are empty but still need to be added
     sensorState["Gravity"].to<JsonObject>();
     sensorState["Gyroscope"].to<JsonObject>();
 
     sensorState["Microphone"]["enabled"] = false;
     sensorState["Bluetooth"]["enabled"] = false;
-#endif
+
+    sensorState["uncalibrated"] = false;
 
     // Create http object
     JsonObject http = doc["http"].to<JsonObject>();
