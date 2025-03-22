@@ -15,6 +15,7 @@ void setup() {
         CoreS3.Display.drawString("Camera Init Fail", CoreS3.Display.width() / 2, CoreS3.Display.height() / 2);
     }
     CoreS3.Display.drawString("Camera Init Success", CoreS3.Display.width() / 2, CoreS3.Display.height() / 2);
+    delay(3000);
 }
 
 void loop() {
@@ -24,6 +25,8 @@ void loop() {
         log_i("got fb %p", fb);
 
         if (fb) {
+            CoreS3.Display.pushImage(0, 0, CoreS3.Display.width(), CoreS3.Display.height(),
+            (uint16_t *)CoreS3.Camera.fb->buf);
 #if 0
             int width = fb->width;
             int height = fb->height;
