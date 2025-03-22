@@ -1,12 +1,35 @@
 #include <M5CoreS3.h>
 #include <Camera.h>
-#include <quirc.h>
+#include <quirc/quirc.h>
 // #include "esp_camera.h"
 
 Camera camera;
 
 struct quirc_code *code;
 struct quirc_data *data;
+
+static inline int grid_bit(const struct quirc_code *code, int x, int y)
+{
+	int p = y * code->size + x;
+	return (code->cell_bitmap[p >> 3] >> (p & 7)) & 1;
+}
+
+
+void quirc_flip(struct quirc_code *code)
+{
+	struct quirc_code flipped = {0};
+	unsigned int offset = 0;
+	for (int y = 0; y < code->size; y++) {
+		for (int x = 0; x < code->size; x++) {
+			if (grid_bit(code, y, x)) {
+				flipped.cell_bitmap[offset >> 3u] |= (1u << (offset & 7u));
+			}
+			offset++;
+		}
+	}
+	memcpy(&code->cell_bitmap, &flipped.cell_bitmap, sizeof(flipped.cell_bitmap));
+}
+
 void setup() {
 
     M5.begin();
@@ -35,11 +58,11 @@ void loop() {
     // Assume camera is set to YUV422
     if (camera.get()) {
         camera_fb_t *fb = camera.fb;
-        // log_i("got fb %p", fb);
-
         if (fb) {
-            CoreS3.Display.pushImage(0, 0, CoreS3.Display.width(), CoreS3.Display.height(),
-                                     (uint16_t *)camera.fb->buf);
+            CoreS3.Display.pushGrayscaleImage(0, 0, CoreS3.Display.width(), CoreS3.Display.height(),
+                                     (uint8_t *)camera.fb->buf, lgfx::v1::grayscale_8bit, TFT_WHITE, TFT_BLACK);            
+            // CoreS3.Display.pushImage(0, 0, CoreS3.Display.width(), CoreS3.Display.height(),
+            //                          (uint16_t *)camera.fb->buf, lgfx::v1::grayscale_8bit);
 
             int width = fb->width;
             int height = fb->height;
@@ -48,9 +71,11 @@ void loop() {
             if (qr && quirc_resize(qr, width, height) >= 0) {
                 uint8_t *image = quirc_begin(qr, &width, &height);
                 if (image) {
-                    for(int i = 0; i < width * height; i++) {
-                        image[i] = fb->buf[2 * i]; // Y channel
-                    }
+                    // for(int i = 0; i < width * height; i++) {
+                    //     image[i] = fb->buf[2 * i]; // Y channel
+                    // }
+                    memcpy(image, fb->buf, fb->len);
+
                     quirc_end(qr);
 
                     int num_codes = quirc_count(qr);
@@ -62,6 +87,10 @@ void loop() {
 
                         quirc_extract(qr, i, code);
                         quirc_decode_error_t err = quirc_decode(code, data);
+                        if (err == QUIRC_ERROR_DATA_ECC) {
+                            quirc_flip(code);
+                            err = quirc_decode(code, data);
+                        }
                         if (!err) {
                             log_i("payload '%s'", data->payload);
                             log_i("Version: %d", data->version);
@@ -70,10 +99,11 @@ void loop() {
                             log_i("Length: %d", data->payload_len);
                             log_i("Payload: %s", data->payload);
 
-                            // String payload = String((const char *)data.payload);
-                            // CoreS3.Display.clear();
-                            // String text = "QR Code: " + payload;
-                            // CoreS3.Display.drawString(text.c_str(), 0, 0);
+                            String payload = String((const char *)data->payload);
+                            CoreS3.Display.clear();
+                            String text = "QR Code: " + payload;
+                            CoreS3.Display.setTextDatum(middle_center);
+                            CoreS3.Display.drawString(text.c_str(), 0, 0);
                             delay(3000);
                         } else {
                             log_e("quirc_decode_error_t %d", err);

@@ -24,8 +24,8 @@ static camera_config_t camera_config = {
     .ledc_channel = LEDC_CHANNEL_0,
 
     .pixel_format  = PIXFORMAT_GRAYSCALE,
-    .frame_size    = FRAMESIZE_VGA,
-    .jpeg_quality  = 15,
+    .frame_size    = FRAMESIZE_QVGA, // FRAMESIZE_VGA, // ,
+    .jpeg_quality  = 0,
     .fb_count      = 1,
     .fb_location   = CAMERA_FB_IN_PSRAM,
     .grab_mode     = CAMERA_GRAB_WHEN_EMPTY,
