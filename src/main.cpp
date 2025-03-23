@@ -1,12 +1,31 @@
 #include <M5CoreS3.h>
+#include <WiFi.h>
 #include <Camera.h>
 #include <quirc.h>
+#include "parsewifi.h"
+
+wl_status_t wifi_status = WL_STOPPED;
 
 Camera camera;
 
 struct quirc_code *code;
 struct quirc_data *data;
 
+
+// Convert RGB565 to 8-bit grayscale using luminance weights
+static inline void rgb565_to_grayscale(const uint16_t* input, uint8_t* output, int width, int height) {
+    for (int i = 0; i < width * height; i++) {
+        uint16_t rgb = input[i];
+
+        // Extract RGB components
+        uint8_t r = ((rgb >> 11) & 0x1F) << 3;  // 5 bits to 8 bits
+        uint8_t g = ((rgb >> 5) & 0x3F) << 2;   // 6 bits to 8 bits
+        uint8_t b = (rgb & 0x1F) << 3;          // 5 bits to 8 bits
+
+        // Calculate grayscale using luminance weights
+        output[i] = (uint8_t)(0.299f * r + 0.587f * g + 0.114f * b);
+    }
+}
 
 void setup() {
 
@@ -35,7 +54,38 @@ void setup() {
 }
 
 void loop() {
-    if (camera.get()) {
+    M5.update();
+
+    wl_status_t ws = WiFi.status();
+    if (ws ^ wifi_status) {
+        wifi_status = ws; // track changes
+        CoreS3.Display.clear();
+        CoreS3.Display.setTextColor(GREEN);
+        // CoreS3.Display.setTextDatum(middle_center);
+        CoreS3.Display.setFont(&fonts::FreeSans12pt7b);
+        CoreS3.Display.setTextSize(1);
+
+        CoreS3.Display.setCursor(0, 20);
+        switch (ws) {
+            case WL_CONNECTED:
+                CoreS3.Display.println("WiFi: Connected");
+                CoreS3.Display.print("IP: ");
+                CoreS3.Display.println(WiFi.localIP());
+
+                break;
+            case WL_NO_SSID_AVAIL:
+                CoreS3.Display.printf("WiFi: SSID\n%s\nnot found\n", WIFI_SSID);
+                break;
+            case WL_DISCONNECTED:
+                CoreS3.Display.printf("WiFi: disconnected\n");
+                break;
+            default:
+                CoreS3.Display.printf("WiFi status: %d\n", ws);
+                break;
+        }
+        log_i("wifi_status=%d", wifi_status);
+    }
+    if ((ws != WL_CONNECTED) && camera.get()) {
         camera_fb_t *fb = camera.fb;
         if (fb) {
             if (camera.config->pixel_format == PIXFORMAT_RGB565) {
@@ -82,7 +132,15 @@ void loop() {
                             log_i("Length: %d", data->payload_len);
                             log_i("Payload: %s", data->payload);
 
-                            String payload = String((const char *)data->payload);
+                            const String payload = String((const char *)data->payload);
+
+                            const struct WiFiConfig &wcfg = parseWiFiQR(payload);
+                            log_i("SSID '%s'", wcfg.SSID.c_str());
+                            log_i("type '%s'", wcfg.type.c_str());
+                            log_i("password '%s'", wcfg.password.c_str());
+
+                            WiFi.begin(wcfg.SSID.c_str(), wcfg.password.c_str());
+
                             String text = "QR Code: " + payload;
 
                             CoreS3.Display.clear();
@@ -118,9 +176,6 @@ void loop() {
             }
             camera.free();
         }
-    } else {
-        log_e("camera.get() fail");
-        delay(1000);
     }
     yield();
 }
