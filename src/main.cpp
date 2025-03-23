@@ -1,16 +1,13 @@
 #include <M5CoreS3.h>
 #include <WiFi.h>
-#include <Camera.h>
+
 #include <quirc.h>
 #include "parsewifi.h"
 
 wl_status_t wifi_status = WL_STOPPED;
 
-Camera camera;
-
 struct quirc_code *code;
 struct quirc_data *data;
-
 
 // Convert RGB565 to 8-bit grayscale using luminance weights
 static inline void rgb565_to_grayscale(const uint16_t* input, uint8_t* output, int width, int height) {
@@ -32,25 +29,26 @@ void setup() {
     M5.begin();
     auto cfg = M5.config();
     CoreS3.begin(cfg);
+
     CoreS3.Display.setTextColor(GREEN);
     CoreS3.Display.setTextDatum(middle_center);
     CoreS3.Display.setFont(&fonts::Orbitron_Light_24);
     CoreS3.Display.setTextSize(1);
 
-    // CoreS3.Speaker.begin();
-
-    if (!camera.begin()) {
+    // tweak the default camera config
+    CoreS3.Camera.config->pixel_format = PIXFORMAT_GRAYSCALE;
+    CoreS3.Camera.config->frame_size = FRAMESIZE_QVGA;
+    if (!CoreS3.Camera.begin()) {
         CoreS3.Display.drawString("Camera Init Fail", CoreS3.Display.width() / 2, CoreS3.Display.height() / 2);
     }
-    CoreS3.Display.drawString("Camera Init Success", CoreS3.Display.width() / 2, CoreS3.Display.height() / 2);
 
     code = (struct quirc_code *)ps_malloc(sizeof(struct quirc_code));
     data = (struct quirc_data *)ps_malloc(sizeof(struct quirc_data));
 
     assert(code != NULL);
     assert(data != NULL);
-
-    delay(3000);
+    CoreS3.Display.drawString("Camera Init Success", CoreS3.Display.width() / 2, CoreS3.Display.height() / 2);
+    delay(500);
 }
 
 void loop() {
@@ -85,16 +83,16 @@ void loop() {
         }
         log_i("wifi_status=%d", wifi_status);
     }
-    if ((ws != WL_CONNECTED) && camera.get()) {
-        camera_fb_t *fb = camera.fb;
+    if ((ws != WL_CONNECTED) && CoreS3.Camera.get()) {
+        camera_fb_t *fb = CoreS3.Camera.fb;
         if (fb) {
-            if (camera.config->pixel_format == PIXFORMAT_RGB565) {
+            if (CoreS3.Camera.config->pixel_format == PIXFORMAT_RGB565) {
                 CoreS3.Display.pushImage(0, 0, CoreS3.Display.width(), CoreS3.Display.height(),
-                                         (uint16_t *)camera.fb->buf);
+                                         (uint16_t *)CoreS3.Camera.fb->buf);
             }
-            if (camera.config->pixel_format == PIXFORMAT_GRAYSCALE) {
+            if (CoreS3.Camera.config->pixel_format == PIXFORMAT_GRAYSCALE) {
                 CoreS3.Display.pushGrayscaleImage(0, 0, CoreS3.Display.width(), CoreS3.Display.height(),
-                                                  (uint8_t *)camera.fb->buf, lgfx::v1::grayscale_8bit, TFT_WHITE, TFT_BLACK);
+                                                  (uint8_t *)CoreS3.Camera.fb->buf, lgfx::v1::grayscale_8bit, TFT_WHITE, TFT_BLACK);
             }
 
             int width = fb->width;
@@ -104,10 +102,10 @@ void loop() {
             if (qr && quirc_resize(qr, width, height) >= 0) {
                 uint8_t *image = quirc_begin(qr, &width, &height);
                 if (image) {
-                    if (camera.config->pixel_format == PIXFORMAT_RGB565) {
+                    if (CoreS3.Camera.config->pixel_format == PIXFORMAT_RGB565) {
                         rgb565_to_grayscale((const uint16_t*)fb->buf, image,  width, height);
                     }
-                    if (camera.config->pixel_format == PIXFORMAT_GRAYSCALE) {
+                    if (CoreS3.Camera.config->pixel_format == PIXFORMAT_GRAYSCALE) {
                         memcpy(image, fb->buf, fb->len);
                     }
                     quirc_end(qr);
@@ -141,11 +139,8 @@ void loop() {
 
                             WiFi.begin(wcfg.SSID.c_str(), wcfg.password.c_str());
 
-                            String text = "QR Code: " + payload;
-
                             CoreS3.Display.clear();
                             CoreS3.Display.setTextColor(GREEN);
-                            // CoreS3.Display.setTextDatum(middle_center);
                             CoreS3.Display.setFont(&fonts::FreeSans12pt7b);
                             CoreS3.Display.setTextSize(1);
 
@@ -160,21 +155,18 @@ void loop() {
                         } else {
                             CoreS3.Display.clear();
                             CoreS3.Display.setTextColor(RED);
-                            // CoreS3.Display.setTextDatum(middle_center);
                             CoreS3.Display.setFont(&fonts::Orbitron_Light_24);
                             CoreS3.Display.setTextSize(1);
-                            // CoreS3.Display.setTextDatum(middle_center);
 
                             CoreS3.Display.setCursor(20, 20);
                             CoreS3.Display.printf("decode error: %d\n",err);
                             delay(500);
-
                         }
                     }
                 }
                 quirc_destroy(qr);
             }
-            camera.free();
+            CoreS3.Camera.free();
         }
     }
     yield();

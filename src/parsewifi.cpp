@@ -81,23 +81,3 @@ WiFiConfig parseWiFiQR(const String& qrText) {
     return config;
 }
 
-
-// for(int i = 0; i < width * height; i++) {
-//     image[i] = fb->buf[2 * i]; // Y channel
-// }
-
-// .pixel_format  = PIXFORMAT_RGB565,
-
-// #include <cstdint>
-
-// uint8_t extractLuminanceInt(uint16_t pixel) {
-//     uint8_t R = (pixel >> 11) & 0x1F; // 0-31
-//     uint8_t G = (pixel >> 5) & 0x3F;  // 0-63
-//     uint8_t B = pixel & 0x1F;         // 0-31
-
-//     // BT.709 coefficients scaled by 1024: 0.2126*1024=218, 0.7152*1024=732, 0.0722*1024=74
-//     uint32_t luminance = (218 * R + 732 * G + 74 * B);
-
-//     // Normalize to 0-255: max value is (218*31 + 732*63 + 74*31) = 55220, so divide by 216 (>> 8 approx)
-//     return (luminance >> 8); // Approximate division by 256
-// }
