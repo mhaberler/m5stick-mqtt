@@ -23,8 +23,8 @@ static camera_config_t camera_config = {
     .ledc_timer   = LEDC_TIMER_0,
     .ledc_channel = LEDC_CHANNEL_0,
 
-    .pixel_format  = PIXFORMAT_RGB565,
-    .frame_size    = FRAMESIZE_QVGA, // FRAMESIZE_VGA, // ,
+    .pixel_format  = PIXFORMAT_GRAYSCALE, // PIXFORMAT_RGB565,
+    .frame_size    = FRAMESIZE_QVGA, // FRAMESIZE_VGA, // FRAMESIZE_QVGA, // FRAMESIZE_VGA, // ,
     .jpeg_quality  = 0,
     .fb_count      = 1,
     .fb_location   = CAMERA_FB_IN_PSRAM,
@@ -39,6 +39,7 @@ bool Camera::begin()
     if (err != ESP_OK) {
         return false;
     }
+    config = &camera_config;
     sensor = esp_camera_sensor_get();
     return true;
 }
