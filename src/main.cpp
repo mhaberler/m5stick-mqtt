@@ -1,6 +1,6 @@
 #include <M5CoreS3.h>
 #include <Camera.h>
-#include <quirc/quirc.h>
+#include <quirc.h>
 // #include "esp_camera.h"
 
 Camera camera;
@@ -8,26 +8,31 @@ Camera camera;
 struct quirc_code *code;
 struct quirc_data *data;
 
-static inline int grid_bit(const struct quirc_code *code, int x, int y)
-{
-	int p = y * code->size + x;
-	return (code->cell_bitmap[p >> 3] >> (p & 7)) & 1;
+// Convert RGB565 to 8-bit grayscale using luminance weights
+static inline void rgb565_to_grayscale(const uint16_t* input, uint8_t* output, int width, int height) {
+    for (int i = 0; i < width * height; i++) {
+        uint16_t rgb = input[i];
+
+        // Extract RGB components
+        uint8_t r = ((rgb >> 11) & 0x1F) << 3;  // 5 bits to 8 bits
+        uint8_t g = ((rgb >> 5) & 0x3F) << 2;   // 6 bits to 8 bits
+        uint8_t b = (rgb & 0x1F) << 3;          // 5 bits to 8 bits
+
+        // Calculate grayscale using luminance weights
+        output[i] = (uint8_t)(0.299f * r + 0.587f * g + 0.114f * b);
+    }
 }
 
-
-void quirc_flip(struct quirc_code *code)
-{
-	struct quirc_code flipped = {0};
-	unsigned int offset = 0;
-	for (int y = 0; y < code->size; y++) {
-		for (int x = 0; x < code->size; x++) {
-			if (grid_bit(code, y, x)) {
-				flipped.cell_bitmap[offset >> 3u] |= (1u << (offset & 7u));
-			}
-			offset++;
-		}
-	}
-	memcpy(&code->cell_bitmap, &flipped.cell_bitmap, sizeof(flipped.cell_bitmap));
+// Convert RGB565 to 8-bit grayscale
+static inline void  convertToGrayscale(uint16_t* src_buffer, uint8_t* dst_buffer, int width, int height) {
+    for (int i = 0; i < width * height; i++) {
+        uint16_t pixel = src_buffer[i];
+        uint8_t R = (pixel & 0xF800) >> 11;
+        uint8_t G = (pixel & 0x07E0) >> 5;
+        uint8_t B = pixel & 0x001F;
+        float gray = 0.2126 * (R / 31.0f) + 0.7152 * (G / 63.0f) + 0.0722 * (B / 31.0f);
+        dst_buffer[i] = round(gray * 255);
+    }
 }
 
 void setup() {
@@ -39,6 +44,8 @@ void setup() {
     CoreS3.Display.setTextDatum(middle_center);
     CoreS3.Display.setFont(&fonts::Orbitron_Light_24);
     CoreS3.Display.setTextSize(1);
+
+    // CoreS3.Speaker.begin();
 
     if (!camera.begin()) {
         CoreS3.Display.drawString("Camera Init Fail", CoreS3.Display.width() / 2, CoreS3.Display.height() / 2);
@@ -59,10 +66,10 @@ void loop() {
     if (camera.get()) {
         camera_fb_t *fb = camera.fb;
         if (fb) {
-            CoreS3.Display.pushGrayscaleImage(0, 0, CoreS3.Display.width(), CoreS3.Display.height(),
-                                     (uint8_t *)camera.fb->buf, lgfx::v1::grayscale_8bit, TFT_WHITE, TFT_BLACK);            
-            // CoreS3.Display.pushImage(0, 0, CoreS3.Display.width(), CoreS3.Display.height(),
-            //                          (uint16_t *)camera.fb->buf, lgfx::v1::grayscale_8bit);
+            // CoreS3.Display.pushGrayscaleImage(0, 0, CoreS3.Display.width(), CoreS3.Display.height(),
+            //                          (uint8_t *)camera.fb->buf, lgfx::v1::grayscale_8bit, TFT_WHITE, TFT_BLACK);
+            CoreS3.Display.pushImage(0, 0, CoreS3.Display.width(), CoreS3.Display.height(),
+                                     (uint16_t *)camera.fb->buf);
 
             int width = fb->width;
             int height = fb->height;
@@ -71,17 +78,25 @@ void loop() {
             if (qr && quirc_resize(qr, width, height) >= 0) {
                 uint8_t *image = quirc_begin(qr, &width, &height);
                 if (image) {
+
+                    rgb565_to_grayscale((const uint16_t*)fb->buf, image,  width, height);
+                    // convertToGrayscale((uint16_t*)fb->buf, image,  width, height);
+
+                    // uint16_t *pixels = (uint16_t *) fb->buf;
                     // for(int i = 0; i < width * height; i++) {
-                    //     image[i] = fb->buf[2 * i]; // Y channel
+                    //     // image[i] = fb->buf[2 * i]; // Y channel
+                    //     image[i]
                     // }
-                    memcpy(image, fb->buf, fb->len);
+                    // memcpy(image, fb->buf, fb->len);
 
                     quirc_end(qr);
 
                     int num_codes = quirc_count(qr);
-                    if (num_codes)
+                    if (num_codes) {
+                        // CoreS3.Speaker.tone(1000, 100);
                         log_i("width %u height %u num_codes %d", fb->width, fb->height,num_codes);
 
+                    }
 
                     for (int i = 0; i < num_codes; i++) {
 
@@ -109,8 +124,6 @@ void loop() {
                             log_e("quirc_decode_error_t %d", err);
                         }
                     }
-#if 0
-#endif
                 }
                 quirc_destroy(qr);
             }
